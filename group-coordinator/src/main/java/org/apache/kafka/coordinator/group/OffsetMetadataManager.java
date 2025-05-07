@@ -16,6 +16,16 @@
  */
 package org.apache.kafka.coordinator.group;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.ApiException;
 import org.apache.kafka.common.errors.GroupIdNotFoundException;
@@ -35,6 +45,7 @@ import org.apache.kafka.common.message.TxnOffsetCommitResponseData.TxnOffsetComm
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.requests.OffsetCommitRequest;
+import static org.apache.kafka.common.requests.OffsetFetchResponse.INVALID_OFFSET;
 import org.apache.kafka.common.requests.TransactionResult;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
@@ -45,28 +56,15 @@ import org.apache.kafka.coordinator.group.classic.ClassicGroupState;
 import org.apache.kafka.coordinator.group.generated.OffsetCommitKey;
 import org.apache.kafka.coordinator.group.generated.OffsetCommitValue;
 import org.apache.kafka.coordinator.group.metrics.GroupCoordinatorMetrics;
+import static org.apache.kafka.coordinator.group.metrics.GroupCoordinatorMetrics.OFFSET_DELETIONS_SENSOR_NAME;
+import static org.apache.kafka.coordinator.group.metrics.GroupCoordinatorMetrics.OFFSET_EXPIRED_SENSOR_NAME;
 import org.apache.kafka.coordinator.group.metrics.GroupCoordinatorMetricsShard;
 import org.apache.kafka.image.MetadataImage;
 import org.apache.kafka.server.authorizer.AuthorizableRequestContext;
 import org.apache.kafka.timeline.SnapshotRegistry;
 import org.apache.kafka.timeline.TimelineHashMap;
 import org.apache.kafka.timeline.TimelineHashSet;
-
 import org.slf4j.Logger;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.OptionalLong;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
-
-import static org.apache.kafka.common.requests.OffsetFetchResponse.INVALID_OFFSET;
-import static org.apache.kafka.coordinator.group.metrics.GroupCoordinatorMetrics.OFFSET_DELETIONS_SENSOR_NAME;
-import static org.apache.kafka.coordinator.group.metrics.GroupCoordinatorMetrics.OFFSET_EXPIRED_SENSOR_NAME;
 
 /**
  * The OffsetMetadataManager manages the offsets of all the groups. It basically maintains
@@ -88,37 +86,37 @@ public class OffsetMetadataManager {
         private GroupCoordinatorConfig config = null;
         private GroupCoordinatorMetricsShard metrics = null;
 
-        Builder withLogContext(LogContext logContext) {
+        public Builder withLogContext(LogContext logContext) {
             this.logContext = logContext;
             return this;
         }
 
-        Builder withSnapshotRegistry(SnapshotRegistry snapshotRegistry) {
+        public Builder withSnapshotRegistry(SnapshotRegistry snapshotRegistry) {
             this.snapshotRegistry = snapshotRegistry;
             return this;
         }
 
-        Builder withTime(Time time) {
+        public Builder withTime(Time time) {
             this.time = time;
             return this;
         }
 
-        Builder withGroupMetadataManager(GroupMetadataManager groupMetadataManager) {
+        public Builder withGroupMetadataManager(GroupMetadataManager groupMetadataManager) {
             this.groupMetadataManager = groupMetadataManager;
             return this;
         }
 
-        Builder withGroupCoordinatorConfig(GroupCoordinatorConfig config) {
+        public Builder withGroupCoordinatorConfig(GroupCoordinatorConfig config) {
             this.config = config;
             return this;
         }
 
-        Builder withMetadataImage(MetadataImage metadataImage) {
+        public Builder withMetadataImage(MetadataImage metadataImage) {
             this.metadataImage = metadataImage;
             return this;
         }
 
-        Builder withGroupCoordinatorMetricsShard(GroupCoordinatorMetricsShard metrics) {
+        public Builder withGroupCoordinatorMetricsShard(GroupCoordinatorMetricsShard metrics) {
             this.metrics = metrics;
             return this;
         }
