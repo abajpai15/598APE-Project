@@ -859,6 +859,9 @@ public class OffsetMetadataManager {
         final TimelineHashMap<String, TimelineHashMap<Integer, OffsetAndMetadata>> groupOffsets =
             failAllPartitions ? null : offsets.offsetsByGroup.get(request.groupId(), lastCommittedOffset);
 
+        final TimelineHashMap<String, TimelineHashMap<Integer, TimelineHashSet<Long>>> openTransactionsByTopic =
+            requireStable ? openTransactions.openTransactionsByGroup.get(request.groupId()) : null;
+
         request.topics().forEach(topic -> {
             final OffsetFetchResponseData.OffsetFetchResponseTopics topicResponse =
                 new OffsetFetchResponseData.OffsetFetchResponseTopics().setName(topic.name());
@@ -867,11 +870,16 @@ public class OffsetMetadataManager {
             final TimelineHashMap<Integer, OffsetAndMetadata> topicOffsets = groupOffsets == null ?
                 null : groupOffsets.get(topic.name(), lastCommittedOffset);
 
+            final TimelineHashMap<Integer, TimelineHashSet<Long>> openTransactionsByPartition =
+                (requireStable && openTransactionsByTopic != null) ? openTransactionsByTopic.get(topic.name()) : null;
+
             topic.partitionIndexes().forEach(partitionIndex -> {
                 final OffsetAndMetadata offsetAndMetadata = topicOffsets == null ?
                     null : topicOffsets.get(partitionIndex, lastCommittedOffset);
 
-                if (requireStable && hasPendingTransactionalOffsets(request.groupId(), topic.name(), partitionIndex)) {
+                if (requireStable &&
+                    openTransactionsByPartition != null &&
+                    openTransactionsByPartition.containsKey(partitionIndex)) {
                     topicResponse.partitions().add(new OffsetFetchResponseData.OffsetFetchResponsePartitions()
                         .setPartitionIndex(partitionIndex)
                         .setErrorCode(Errors.UNSTABLE_OFFSET_COMMIT.code())
@@ -925,10 +933,15 @@ public class OffsetMetadataManager {
         final TimelineHashMap<String, TimelineHashMap<Integer, OffsetAndMetadata>> groupOffsets =
             offsets.offsetsByGroup.get(request.groupId(), lastCommittedOffset);
 
+        final TimelineHashMap<String, TimelineHashMap<Integer, TimelineHashSet<Long>>> openTransactionsByTopic =
+            requireStable ? openTransactions.openTransactionsByGroup.get(request.groupId()) : null;
+
         if (groupOffsets != null) {
             groupOffsets.entrySet(lastCommittedOffset).forEach(topicEntry -> {
                 final String topic = topicEntry.getKey();
                 final TimelineHashMap<Integer, OffsetAndMetadata> topicOffsets = topicEntry.getValue();
+                final TimelineHashMap<Integer, TimelineHashSet<Long>> openTransactionsByPartition =
+                    (requireStable && openTransactionsByTopic != null) ? openTransactionsByTopic.get(topic) : null;
 
                 final OffsetFetchResponseData.OffsetFetchResponseTopics topicResponse =
                     new OffsetFetchResponseData.OffsetFetchResponseTopics().setName(topic);
@@ -938,7 +951,9 @@ public class OffsetMetadataManager {
                     final int partition = partitionEntry.getKey();
                     final OffsetAndMetadata offsetAndMetadata = partitionEntry.getValue();
 
-                    if (requireStable && hasPendingTransactionalOffsets(request.groupId(), topic, partition)) {
+                    if (requireStable &&
+                        openTransactionsByPartition != null &&
+                        openTransactionsByPartition.containsKey(partition)) {
                         topicResponse.partitions().add(new OffsetFetchResponseData.OffsetFetchResponsePartitions()
                             .setPartitionIndex(partition)
                             .setErrorCode(Errors.UNSTABLE_OFFSET_COMMIT.code())
